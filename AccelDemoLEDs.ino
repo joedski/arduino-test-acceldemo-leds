@@ -4,6 +4,7 @@
 #include <SPI.h>
 #include <Adafruit_LIS3DH.h>
 #include <Adafruit_Sensor.h>
+#include <FastLED.h>
 
 //// Used for software SPI
 //#define LIS3DH_CLK 13
@@ -19,51 +20,105 @@
 // I2C
 Adafruit_LIS3DH lis = Adafruit_LIS3DH();
 
-#if defined(ARDUINO_ARCH_SAMD)
-// for Zero, output on USB Serial console, remove line below if using programming port to program the Zero!
-   #define Serial SerialUSB
-#endif
+#define LED_PIN 6
+#define LED_COUNT 6
+
+CRGB leds[LED_COUNT];
+
+uint8_t colorChannelValue(int16_t reading) {
+  uint16_t readingAbs = (reading < 0 ? -reading : reading);
+  if (readingAbs > 8195) return 255;
+  return readingAbs >> 5;
+}
+
+CRGB colorValue(int16_t reading) {
+  return CRGB(
+    dim8_raw(colorChannelValue(reading)),
+    dim8_raw(colorChannelValue(reading) / 2),
+    0
+  );
+}
+
+// #if defined(ARDUINO_ARCH_SAMD)
+// // for Zero, output on USB Serial console, remove line below if using programming port to program the Zero!
+//    #define Serial SerialUSB
+// #endif
 
 void setup(void) {
-//#ifndef ESP8266
-//  while (!Serial);     // will pause Zero, Leonardo, etc until serial console opens
-//#endif
-//
-//  Serial.begin(9600);
-//  Serial.println("LIS3DH test!");
-  
+// #ifndef ESP8266
+//   while (!Serial);     // will pause Zero, Leonardo, etc until serial console opens
+// #endif
+
+  // Serial.begin(9600);
+  // Serial.println("LIS3DH test!");
+
   if (! lis.begin(0x18)) {   // change this to 0x19 for alternative i2c address
-//    Serial.println("Couldnt start");
+    // Serial.println("Couldnt start");
     // TODO: Show Error LED.
     while (1);
   }
-//  Serial.println("LIS3DH found!");
-  
+  // Serial.println("LIS3DH found!");
+
+  // Since this is 4G, 1G = 32767 * 1/4 or 32767 >> 2 or 8195
   lis.setRange(LIS3DH_RANGE_4_G);   // 2, 4, 8 or 16 G!
-  
-//  Serial.print("Range = "); Serial.print(2 << lis.getRange());  
-//  Serial.println("G");
+
+  FastLED.addLeds<NEOPIXEL, LED_PIN>(leds, LED_COUNT);
+  // FastLED.setBrightness(128);
+
+  // Serial.print("Range = "); Serial.print(2 << lis.getRange());
+  // Serial.println("G");
 }
 
 void loop() {
   lis.read();      // get X Y and Z data at once
   // TODO: these are int16_t, translate them into RGB values for the pixels to point the direction.
   // Then print out the raw data
-//  Serial.print("X:  "); Serial.print(lis.x); 
-//  Serial.print("  \tY:  "); Serial.print(lis.y); 
-//  Serial.print("  \tZ:  "); Serial.print(lis.z); 
+  // Serial.print("X:  "); Serial.print(lis.x);
+  // Serial.print("  \tY:  "); Serial.print(lis.y);
+  // Serial.print("  \tZ:  "); Serial.print(lis.z);
+  // x: 2, 4
+  // y: 1, 3
+  // z: 5, 0
+  if (lis.x > 0) {
+    leds[2] = colorValue(lis.x);
+    leds[4] = CRGB::Black;
+  }
+  else {
+    leds[2] = CRGB::Black;
+    leds[4] = colorValue(lis.x);
+  }
 
-//  /* Or....get a new sensor event, normalized */ 
-//  sensors_event_t event; 
-//  lis.getEvent(&event);
-  
-  /* Display the results (acceleration is measured in m/s^2) */
-//  Serial.print("\t\tX: "); Serial.print(event.acceleration.x);
-//  Serial.print(" \tY: "); Serial.print(event.acceleration.y); 
-//  Serial.print(" \tZ: "); Serial.print(event.acceleration.z); 
-//  Serial.println(" m/s^2 ");
-//
-//  Serial.println();
-// 
-//  delay(200); 
+  if (lis.y > 0) {
+    leds[1] = colorValue(lis.y);
+    leds[3] = CRGB::Black;
+  }
+  else {
+    leds[1] = CRGB::Black;
+    leds[3] = colorValue(lis.y);
+  }
+
+  if (lis.z > 0) {
+    leds[5] = colorValue(lis.z);
+    leds[0] = CRGB::Black;
+  }
+  else {
+    leds[5] = CRGB::Black;
+    leds[0] = colorValue(lis.z);
+  }
+
+  FastLED.show();
+
+  // /* Or....get a new sensor event, normalized */
+  // sensors_event_t event;
+  // lis.getEvent(&event);
+  //
+  // /* Display the results (acceleration is measured in m/s^2) */
+  // Serial.print("\t\tX: "); Serial.print(event.acceleration.x);
+  // Serial.print(" \tY: "); Serial.print(event.acceleration.y);
+  // Serial.print(" \tZ: "); Serial.print(event.acceleration.z);
+  // Serial.println(" m/s^2 ");
+  //
+  // Serial.println();
+  //
+  // delay(200);
 }
