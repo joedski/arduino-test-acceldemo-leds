@@ -1,4 +1,5 @@
 // Basic demo for accelerometer readings from Adafruit LIS3DH
+// Adapted for use with 6 neopixels arranged roughly at the vertices of an octohedron.
 
 #include <Wire.h>
 #include <SPI.h>
@@ -25,88 +26,75 @@ Adafruit_LIS3DH lis = Adafruit_LIS3DH();
 
 CRGB leds[LED_COUNT];
 
-uint8_t colorChannelValue(int16_t reading) {
-  uint16_t readingAbs = (reading < 0 ? -reading : reading);
-  if (readingAbs > 8195) return 255;
-  return readingAbs >> 5;
+DEFINE_GRADIENT_PALETTE (heatmap_gp) {
+    0,     0,  0,  0,   //black
+   64,   255,  0,  0,   //red
+  196,   255,255,  0,   //bright yellow
+  255,   255,255,255    //full white
+};
+
+CRGBPalette16 ledsPalette = heatmap_gp;
+
+CRGB getLedPaletteColor(uint16_t reading) {
+  return ColorFromPalette(ledsPalette, reading >> 7);
 }
 
-CRGB colorValue(int16_t reading) {
-  return CRGB(
-    dim8_raw(colorChannelValue(reading)),
-    dim8_raw(colorChannelValue(reading) / 2),
-    0
-  );
-}
-
-// #if defined(ARDUINO_ARCH_SAMD)
-// // for Zero, output on USB Serial console, remove line below if using programming port to program the Zero!
-//    #define Serial SerialUSB
-// #endif
 
 void setup(void) {
-// #ifndef ESP8266
-//   while (!Serial);     // will pause Zero, Leonardo, etc until serial console opens
-// #endif
-
-  // Serial.begin(9600);
-  // Serial.println("LIS3DH test!");
-
   if (! lis.begin(0x18)) {   // change this to 0x19 for alternative i2c address
     // Serial.println("Couldnt start");
     // TODO: Show Error LED.
     while (1);
   }
-  // Serial.println("LIS3DH found!");
 
   // Since this is 4G, 1G = 32767 * 1/4 or 32767 >> 2 or 8195
+  // By default, the LIS3DH is configured so that at rest, there's 1G in the upwards direction:
+  // the 1G counteracting the acceleration due to Earth's gravity.
   lis.setRange(LIS3DH_RANGE_4_G);   // 2, 4, 8 or 16 G!
 
   FastLED.addLeds<NEOPIXEL, LED_PIN>(leds, LED_COUNT);
-  // FastLED.setBrightness(128);
-
-  // Serial.print("Range = "); Serial.print(2 << lis.getRange());
-  // Serial.println("G");
+  FastLED.setBrightness(64);
 }
 
 void loop() {
-  lis.read();      // get X Y and Z data at once
-  // TODO: these are int16_t, translate them into RGB values for the pixels to point the direction.
-  // Then print out the raw data
-  // Serial.print("X:  "); Serial.print(lis.x);
-  // Serial.print("  \tY:  "); Serial.print(lis.y);
-  // Serial.print("  \tZ:  "); Serial.print(lis.z);
+  // get X Y and Z data at once
+  lis.read();
   // x: 2, 4
   // y: 1, 3
   // z: 5, 0
   if (lis.x > 0) {
-    leds[2] = colorValue(lis.x);
-    leds[4] = CRGB::Black;
+    leds[4] = getLedPaletteColor(lis.x);
+    leds[2] = CRGB::Black;
   }
   else {
-    leds[2] = CRGB::Black;
-    leds[4] = colorValue(lis.x);
+    leds[4] = CRGB::Black;
+    leds[2] = getLedPaletteColor(-lis.x);
   }
 
   if (lis.y > 0) {
-    leds[1] = colorValue(lis.y);
-    leds[3] = CRGB::Black;
+    leds[3] = getLedPaletteColor(lis.y);
+    leds[1] = CRGB::Black;
   }
   else {
-    leds[1] = CRGB::Black;
-    leds[3] = colorValue(lis.y);
+    leds[3] = CRGB::Black;
+    leds[1] = getLedPaletteColor(-lis.y);
   }
 
   if (lis.z > 0) {
-    leds[5] = colorValue(lis.z);
+    leds[5] = getLedPaletteColor(lis.z);
     leds[0] = CRGB::Black;
   }
   else {
     leds[5] = CRGB::Black;
-    leds[0] = colorValue(lis.z);
+    leds[0] = getLedPaletteColor(-lis.z);
   }
 
   FastLED.show();
+
+  // TODO: I might want to play with events more.
+  // While float math is slower, it's easier to work with,
+  // and for vector stuff I'd probably end up having to constantly
+  // upgrade those int16_t to int32_t just to deal with overflow.
 
   // /* Or....get a new sensor event, normalized */
   // sensors_event_t event;
